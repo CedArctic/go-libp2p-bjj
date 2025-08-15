@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/iden3/go-iden3-crypto/v2/babyjub"
 )
 
 // KeyPairFromStdKey wraps standard library (and secp256k1) private keys in libp2p/go-libp2p/core/crypto keys
@@ -21,6 +22,9 @@ func KeyPairFromStdKey(priv crypto.PrivateKey) (PrivKey, PubKey, error) {
 
 	case *ecdsa.PrivateKey:
 		return &ECDSAPrivateKey{p}, &ECDSAPublicKey{&p.PublicKey}, nil
+
+	case *babyjub.PrivateKey:
+		return &BJJPrivateKey{p}, &BJJPublicKey{p.Public()}, nil
 
 	case *ed25519.PrivateKey:
 		pubIfc := p.Public()
@@ -48,6 +52,8 @@ func PrivKeyToStdKey(priv PrivKey) (crypto.PrivateKey, error) {
 		return &p.sk, nil
 	case *ECDSAPrivateKey:
 		return p.priv, nil
+	case *BJJPrivateKey:
+		return p, nil
 	case *Ed25519PrivateKey:
 		return &p.k, nil
 	case *Secp256k1PrivateKey:
@@ -68,6 +74,8 @@ func PubKeyToStdKey(pub PubKey) (crypto.PublicKey, error) {
 		return &p.k, nil
 	case *ECDSAPublicKey:
 		return p.pub, nil
+	case *BJJPublicKey:
+		return p, nil
 	case *Ed25519PublicKey:
 		return p.k, nil
 	case *Secp256k1PublicKey:
