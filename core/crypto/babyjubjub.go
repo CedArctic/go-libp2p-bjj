@@ -140,6 +140,11 @@ func (ePub *BJJPublicKey) Raw() (res []byte, err error) {
 	return compressed[:], nil
 }
 
+// Type returns the key type
+func (ePub *BJJPublicKey) GetXY() (big.Int, big.Int) {
+	return *ePub.pub.X, *ePub.pub.Y
+}
+
 // Equals compares to public keys
 func (ePub *BJJPublicKey) Equals(o Key) bool {
 	return basicEquals(ePub, o)
