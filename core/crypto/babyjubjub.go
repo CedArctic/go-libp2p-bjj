@@ -24,14 +24,52 @@ type BJJPublicKey struct {
 
 // GenerateBJJKeyPair generates a new Babyjubjub private and public key
 func GenerateBJJKeyPair(src io.Reader) (PrivKey, PubKey, error) {
-	privKey := new(babyjub.PrivateKey)
-	_, err := src.Read(privKey[:])
+	// Generate 32 random bytes
+	var buf [32]byte
+	_, err := io.ReadFull(src, buf[:])
 	if err != nil {
 		return nil, nil, err
 	}
-	pubKey := privKey.Public()
 
-	return &BJJPrivateKey{privKey}, &BJJPublicKey{pubKey}, nil
+	// Convert random bytes to scalar sk
+	sk := new(big.Int).SetBytes(buf[:])
+	L := babyjub.SubOrder
+
+	// Reduce modulo the subgroup order
+	sk.Mod(sk, L)
+	if sk.Sign() == 0 {
+		sk.SetInt64(1)
+	}
+
+	// Create a BabyJubJub private scalar
+	skScalar := babyjub.NewPrivKeyScalar(sk)
+
+	// Derive the public key using the existing .Public() method
+	pubKey := skScalar.Public()
+
+	// Wrap into the expected key types
+	privKey := new(babyjub.PrivateKey)
+	copy(privKey[:], buf[:])
+
+	return &BJJPrivateKey{priv: privKey}, &BJJPublicKey{pub: pubKey}, nil
+}
+
+// BJJKeyPairFromScalar creates a keypair from a given scalar sk.
+func BJJKeyPairFromScalar(sk *big.Int) (PrivKey, PubKey, error) {
+	L := babyjub.SubOrder
+	sk.Mod(sk, L)
+	if sk.Sign() == 0 {
+		sk.SetInt64(1)
+	}
+
+	skScalar := babyjub.NewPrivKeyScalar(sk)
+	pubKey := skScalar.Public()
+
+	privKey := new(babyjub.PrivateKey)
+	skBytes := sk.Bytes()
+	copy(privKey[32-len(skBytes):], skBytes) // right-align for big-endian
+
+	return &BJJPrivateKey{priv: privKey}, &BJJPublicKey{pub: pubKey}, nil
 }
 
 // BJJKeyPairFromKey generates a new Babyjubjub private and public key from an input private key
@@ -40,7 +78,19 @@ func BJJKeyPairFromKey(priv *babyjub.PrivateKey) (PrivKey, PubKey, error) {
 		return nil, nil, ErrNilPrivateKey
 	}
 
-	return &BJJPrivateKey{priv}, &BJJPublicKey{priv.Public()}, nil
+	// Convert raw bytes to scalar
+	sk := new(big.Int).SetBytes(priv[:])
+	L := babyjub.SubOrder
+	sk.Mod(sk, L)
+	if sk.Sign() == 0 {
+		sk.SetInt64(1)
+	}
+
+	// Create BabyJubJub private scalar and derive public key
+	skScalar := babyjub.NewPrivKeyScalar(sk)
+	pubKey := skScalar.Public()
+
+	return &BJJPrivateKey{priv}, &BJJPublicKey{pubKey}, nil
 }
 
 // BJJPublicKeyFromPubKey generates a new Babyjubjub public key from an input public key
@@ -125,7 +175,21 @@ func (ePriv *BJJPrivateKey) Sign(data []byte) (sig []byte, err error) {
 
 // GetPublic returns a public key
 func (ePriv *BJJPrivateKey) GetPublic() PubKey {
-	return &BJJPublicKey{ePriv.priv.Public()}
+	// Convert the private key bytes into a scalar
+	sk := new(big.Int).SetBytes(ePriv.priv[:])
+	L := babyjub.SubOrder
+
+	// Reduce modulo the subgroup order and ensure nonzero
+	sk.Mod(sk, L)
+	if sk.Sign() == 0 {
+		sk.SetInt64(1)
+	}
+
+	// Derive public key from scalar
+	skScalar := babyjub.NewPrivKeyScalar(sk)
+	pubKey := skScalar.Public()
+
+	return &BJJPublicKey{pubKey}
 }
 
 // Type returns the key type
