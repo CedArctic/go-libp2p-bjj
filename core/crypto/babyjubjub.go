@@ -104,6 +104,11 @@ func (ePriv *BJJPrivateKey) Equals(o Key) bool {
 	return basicEquals(ePriv, o)
 }
 
+// Equals compares two private keys
+func (ePriv *BJJPrivateKey) SkToBigInt() *big.Int {
+	return babyjub.SkToBigInt(ePriv.priv)
+}
+
 // Sign returns the signature of the input data
 func (ePriv *BJJPrivateKey) Sign(data []byte) (sig []byte, err error) {
 	defer func() { catch.HandlePanic(recover(), &err, "Babyjubjub signing") }()
